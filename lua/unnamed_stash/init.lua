@@ -9,6 +9,9 @@ local defaults = {
   save_delay = 1000,
   -- Periodic save interval (ms), 0 to disable
   periodic_save = 60000,
+  -- Delete old stash files when saving new ones (true = only current session's
+  -- buffers are kept; false = stash files accumulate across sessions)
+  auto_clean = true,
 }
 
 local config = {}
@@ -73,11 +76,16 @@ function M.save()
   -- Don't clear stash if there's nothing to save (avoids wiping after QuitPre)
   if #unnamed_bufs == 0 then return end
 
-  local old_files = vim.fn.glob(config.stash_dir .. "/*.stash", false, true)
-  for _, fp in ipairs(old_files) do
-    os.remove(fp)
+  if config.auto_clean then
+    -- Remove all old stash files before writing
+    local old_files = vim.fn.glob(config.stash_dir .. "/*.stash", false, true)
+    for _, fp in ipairs(old_files) do
+      os.remove(fp)
+    end
   end
 
+  -- Collect filenames we're about to write so we can remove stale ones
+  local written_files = {}
   local ts_counts = {}
   for _, buf in ipairs(unnamed_bufs) do
     if buf == vim.api.nvim_get_current_buf() then
@@ -86,7 +94,9 @@ function M.save()
     end
     local created_at = get_created_at(buf)
     ts_counts[created_at] = (ts_counts[created_at] or 0)
+    local fname = string.format("%d_%d.stash", created_at, ts_counts[created_at])
     save_buffer(buf, created_at, ts_counts[created_at])
+    written_files[fname] = true
     ts_counts[created_at] = ts_counts[created_at] + 1
   end
 end
@@ -143,8 +153,10 @@ function M.restore()
     end
   end
 
-  for _, fp in ipairs(files) do
-    os.remove(fp)
+  if config.auto_clean then
+    for _, fp in ipairs(files) do
+      os.remove(fp)
+    end
   end
 end
 

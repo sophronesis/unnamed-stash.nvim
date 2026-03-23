@@ -52,6 +52,8 @@ Default options:
   save_delay = 1000,
   -- Periodic save interval (ms), 0 to disable
   periodic_save = 60000,
+  -- Delete old stash files when saving new ones (false = accumulate across sessions)
+  auto_clean = true,
 }
 ```
 
